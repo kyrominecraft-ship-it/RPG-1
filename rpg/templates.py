@@ -1,6 +1,6 @@
 """Free-text templates; heading suggestions never restrict legitimate profile content."""
 import re
-from .store import encoded
+from .context import check_budget, AUXILIARY_BUDGET
 from .engine import canonical_sources
 
 PROFILE_PROMPT = '''Draft ONE important NPC profile using the selected editable TXT template
@@ -58,8 +58,7 @@ def draft_profile(store, model, name, template, brief):
         raise ValueError('A profile with this name already exists; existing profiles are never replaced')
     payload = {'name': name, 'brief': brief, 'template': snapshot['documents'][template]['content'],
                'campaign_sources': canonical_sources(snapshot)}
-    if len(encoded(payload)) > 24000:
-        raise ValueError('Profile drafting context exceeds the prototype budget')
+    check_budget(payload, AUXILIARY_BUDGET, 'Profile drafting context', snapshot['documents'])
     content = model.generate('gm', PROFILE_PROMPT, payload)
     if not isinstance(content, str) or not content.strip() or len(content.encode()) > 20000:
         raise ValueError('Invalid or oversized profile draft')

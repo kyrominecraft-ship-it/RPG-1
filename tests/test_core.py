@@ -214,8 +214,16 @@ class CoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Incomplete event log'):
             self.store.snapshot()
 
+    def test_campaign_above_old_18kb_limit_works_without_dropping_sources(self):
+        (self.root / 'long-world.txt').write_text('world detail ' * 2000, encoding='utf-8')
+        model = FakeModel([APPROVE], updates=[])
+        result = Engine(self.store, model).play('Wait')
+        self.assertEqual(result['status'], 'approved')
+        self.assertEqual(model.calls[0][1]['sources']['document:long-world.txt'], 'world detail ' * 2000)
+        self.assertEqual(model.calls[1][1]['sources']['document:long-world.txt'], 'world detail ' * 2000)
+
     def test_context_limit_and_path_escape(self):
-        (self.root / 'large.txt').write_text('x' * 19000)
+        (self.root / 'large.txt').write_text('x' * 49000)
         with self.assertRaisesRegex(ValueError, 'context budget'):
             self.play()
         (self.root / 'large.txt').unlink()

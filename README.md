@@ -316,10 +316,10 @@ actions while it is working. `ollama ps` in PowerShell during generation shows G
 - **Model quality:** separate prompts are not a guarantee of independent judgment. Exact
   quotations can be misinterpreted; important changes require your review.
 - **Small campaign context:** a file is limited to 200 KB, but all active source/story context
-  must currently fit an 18 KB budget. Complete model requests have a separate 32 KB limit.
+  must currently fit a 48,000-byte budget. Complete model requests have a separate 96,000-byte limit.
   Profile drafting and continuity have their own small request budgets. The app refuses
   oversized contexts instead of intentionally dropping history. These byte budgets are not
-  exact model-token counts; unusual text may still exceed the requested 16,384-token context.
+  exact model-token counts; unusual text may still exceed the requested 32,768-token context.
   Start with 1–3 short NPC profiles. Supporting more characters needs no schema redesign,
   but larger/longer campaigns will need retrieval before these limits become comfortable.
 - **One local player:** run one application instance per campaign. It is not a networked or
@@ -349,6 +349,17 @@ for cloud development. HTTP tests require loopback socket access. Each cloud tas
 isolated; do not create another Git worktree unless requested. No application preview link
 is provided for this cloud instance. It cannot install or run software on your Windows PC.
 
-Validation for this revision: **24 tests passed, one Windows-only sharing-semantics test
+Validation for this revision: **25 tests passed, one Windows-only sharing-semantics test
 was skipped on Linux**. JavaScript syntax and command-line help were also checked. Real
 Ollama inference and browser interactions on Windows remain to be verified on your PC.
+
+### Full-source context update
+
+The original 18 KB total campaign limit has been increased to 48,000 UTF-8 JSON bytes,
+with a 96,000-byte complete request guard and a requested Ollama context of 32,768 tokens.
+Both roles still receive all sources; no retrieval, summarization, or source filtering is
+performed. Larger context can increase GPU memory use and latency. Byte limits are only
+application guards, not exact token estimates. If the guard is exceeded, its error includes
+the total size and largest source documents. Your campaign files and history are preserved.
+This change has automated coverage above the previous 18 KB threshold; actual GPU memory
+usage and response quality still require validation on your PC.
