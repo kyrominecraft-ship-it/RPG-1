@@ -1,0 +1,2 @@
+"""Local RPG prototype."""
+

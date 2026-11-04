@@ -1,0 +1,16 @@
+CHARACTER PROFILE TEMPLATE
+Use the headings below as suggestions. Add, remove, rename, or reorganize them freely.
+Keep each character distinct. Do not change established information to fit a scene.
+Secrets in a profile are not automatically known by other characters.
+
+# Name and role
+# Appearance and manner
+# History
+# Personality
+# Motivations and goals
+# Emotional tendencies
+# Relationships
+# Beliefs and assumptions
+# Secrets
+# Knowledge and its sources
+# Current circumstances

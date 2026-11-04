@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Local RPG</title>
+<style>
+body{max-width:950px;margin:28px auto;padding:0 20px;background:#18191c;color:#eee;font:16px/1.5 system-ui}
+textarea,input,select,button{font:inherit;padding:9px;background:#282b31;color:#eee;border:1px solid #777;border-radius:5px}
+textarea{box-sizing:border-box;width:100%;height:100px}input{min-width:240px;max-width:90%}button{cursor:pointer;margin:6px 6px 6px 0}
+button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.5 monospace}
+article,section.panel{border-bottom:1px solid #555;padding:14px 0}article{white-space:pre-wrap}#status,#warnings{color:#e8c889}
+#campaignPath{overflow-wrap:anywhere}summary{cursor:pointer}h2{font-size:1.2rem}
+</style>
+<h1>Local RPG</h1>
+<section class="panel"><h2>Choose your campaign</h2>
+<button id="browse">Choose folder…</button><select id="campaignList"><option value="">Saved campaign folders</option></select><button id="selectCampaign">Open selected</button>
+<details><summary>Open a folder by its path</summary><input id="folderPath" aria-label="Campaign folder path"><button id="openPath">Open folder</button></details>
+<p><input id="newName" placeholder="New campaign name" aria-label="New campaign name"><button id="create">Create campaign</button></p>
+<p id="campaignPath">No campaign selected.</p><p id="sources"></p><p id="warnings"></p>
+</section>
+<section id="templatePanel" class="panel" hidden>
+<h2>Important characters and editable templates</h2>
+<p>Only profiles you supply or approve get individual continuity files. Template headings are suggestions.</p>
+<details><summary>Optional template updates for existing profiles</summary><pre id="templateHints"></pre></details>
+<details><summary>Ask the AI to draft a new character profile</summary>
+<p><label>Name <input id="profileName" maxlength="80"></label></p>
+<p><label>Template <select id="profileTemplate"></select></label></p>
+<label for="profileBrief">Describe the character and established details to preserve</label><textarea id="profileBrief" maxlength="4000"></textarea>
+<button id="draftProfile">Draft for my review</button></details>
+<section id="profileDrafts"></section></section>
+<section id="history" aria-live="polite"></section>
+<form id="play"><label for="action">Your action</label><textarea id="action" maxlength="4000" required></textarea><button id="submit">Send action</button></form>
+<p id="status" role="status"></p><section id="review"></section>
+<script>
+const $=id=>document.getElementById(id);let busy=false;let current=null;
+async function api(path,body){const response=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data;}
+async function operation(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);
+ try{await fn();}catch(e){$('status').textContent=e.message;}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+function button(label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>operation(fn);return b;}
+function message(text){const a=document.createElement('article');a.textContent=text;$('history').append(a);}
+function showAudit(turn){const box=document.createElement('section');const h=document.createElement('h2');h.textContent=turn.status==='paused'?'Paused after three rejections':'Generation stopped';
+ const pre=document.createElement('pre');pre.textContent='Player action: '+turn.action+'\n\n'+JSON.stringify(turn.audit,null,2);box.append(h,pre);
+ if(turn.status==='paused')box.append(button('I reviewed the audit — resume',async()=>{await api('resume',{turn:turn.id});await load();$('status').textContent='Resumed. Rejected drafts remain noncanonical.';}));
+ $('review').append(box);}
+function showUpdates(turn){const panel=document.createElement('section');const h=document.createElement('h2');h.textContent='Continuity updates — review before saving';panel.append(h);
+ if(turn.continuity_audit?.some(a=>a.error)){const p=document.createElement('p');p.textContent='Continuity proposal failed: '+turn.continuity_audit.filter(a=>a.error).map(a=>a.error).join('; ');panel.append(p);}
+ if(turn.proposals.length){const pre=document.createElement('pre');pre.textContent=JSON.stringify(turn.proposals,null,2);panel.append(pre,
+ button('Approve and save these additions',async()=>{await api('updates',{turn:turn.id});await load();$('status').textContent='Continuity saved. Earlier file versions are preserved.';}),
+ button('Reject these additions',async()=>{await api('updates/decline',{turn:turn.id});await load();}));}
+ panel.append(button('Request fresh continuity proposals',async()=>{$('status').textContent='Administrator is reviewing approved canon…';const result=await api('updates/retry',{turn:turn.id});panel.remove();showUpdates(result);$('status').textContent='Review the proposals before saving.';}));
+ $('review').append(panel);}
+function sourceInfo(state){$('campaignPath').textContent=state.campaign?'Current folder: '+state.campaign:'No campaign selected. Choose or create one above.';
+ $('sources').textContent='Loaded files: '+Object.keys(state.documents).join(', ');$('warnings').textContent=state.warnings.join('\n');}
+async function load(){const state=await api('state');current=state.campaign;sourceInfo(state);
+ const chosen=$('campaignList').value;$('campaignList').replaceChildren(new Option('Choose a campaign', ''));for(const c of state.campaigns)$('campaignList').add(new Option(c.name,c.path));$('campaignList').value=chosen;
+ $('history').replaceChildren();$('review').replaceChildren();
+ const stories=state.events.filter(e=>e.kind==='story');for(const e of stories){const t=e.payload.turn;message('You: '+t.action+'\n\nGM: '+t.response);}
+ if(state.paused)showAudit(state.paused);for(const t of state.pending_updates)showUpdates(t);
+ if(!state.pending_updates.length&&stories.length)showUpdates({...stories.at(-1).payload.turn,proposals:[]});
+ if(window.renderTemplates)window.renderTemplates(state);
+ return state;}
+$('browse').onclick=()=>operation(async()=>{const result=await api('campaign/browse',{});if(result.campaign)await load();});
+$('selectCampaign').onclick=()=>operation(async()=>{await api('campaign/select',{path:$('campaignList').value});await load();});
+$('openPath').onclick=()=>operation(async()=>{await api('campaign/select',{path:$('folderPath').value});await load();});
+$('create').onclick=()=>operation(async()=>{await api('campaign/create',{name:$('newName').value});await load();$('status').textContent='Campaign created. Edit Rules.txt and add character profiles before playing.';});
+$('play').onsubmit=e=>{e.preventDefault();operation(async()=>{$('status').textContent='GM and administrator are working. Local generation may take several minutes.';
+ const result=await api('play',{action:$('action').value});if(result.status==='approved'){$('action').value='';await load();$('status').textContent='Approved narration recorded as canon. Review continuity additions below.';
+ if(result.continuity_audit?.some(a=>a.error)){$('status').textContent+=' Continuity proposals failed; you can retry below.';}}
+ else{await load();if(result.status!=='paused')showAudit(result);$('status').textContent='No story event was saved.';}});};
+function profileDraft(draft){const panel=document.createElement('section');const h=document.createElement('h3');h.textContent='Unsaved profile draft: '+draft.document;
+ const text=document.createElement('textarea');text.value=draft.content;text.style.height='320px';text.setAttribute('aria-label','Editable profile draft');
+ panel.append(h,text,button('Approve and create this profile',async()=>{await api('profile/accept',{draft:draft.id,content:text.value});await load();$('status').textContent='Profile created with a separate continuity file. No existing profile was rewritten.';}),
+ button('Discard draft',async()=>{await api('profile/decline',{draft:draft.id});await load();}));$('profileDrafts').append(panel);}
+window.refreshTemplateHints=state=>{const report=state.template_report;if(!report)return;
+ $('templateHints').textContent=report.suggestions.map(s=>s.profile+' ← '+s.template+'\n'+(s.template_changed?'Template text has changed since this profile was first seen. Review it if useful.\n':'')+
+ (s.optional_missing_headings.length?'Optional headings not detected: '+s.optional_missing_headings.join(', '):'No missing headings detected.')+'\nExisting details are always preserved.').join('\n\n')||'No profile/template comparisons yet. Add TXT files in Characters and Templates.';};
+window.renderTemplates=state=>{$('templatePanel').hidden=!state.campaign;if(!state.campaign)return;
+ const select=$('profileTemplate'),chosen=select.value;select.replaceChildren();for(const name of state.template_report.templates)select.add(new Option(name,name));if([...select.options].some(o=>o.value===chosen))select.value=chosen;
+ window.refreshTemplateHints(state);$('profileDrafts').replaceChildren();for(const draft of state.profile_drafts)profileDraft(draft);};
+$('draftProfile').onclick=()=>operation(async()=>{$('status').textContent='Drafting a profile for your review. No character file has been created.';
+ const draft=await api('profile/draft',{name:$('profileName').value,template:$('profileTemplate').value,brief:$('profileBrief').value});profileDraft(draft);$('status').textContent='Review and edit the draft below, then approve or discard it.';});
+load().catch(e=>$('status').textContent=e.message);
+setInterval(async()=>{if(busy||!current)return;try{const state=await api('state');sourceInfo(state);if(window.refreshTemplateHints)window.refreshTemplateHints(state);}catch(e){$('warnings').textContent='File loading stopped: '+e.message;}},5000);
+</script></html>
