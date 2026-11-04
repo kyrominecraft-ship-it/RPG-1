@@ -4,3 +4,7 @@ Only request a roll when the outcome is uncertain and failure has meaningful con
 Never invent a player's dice roll. Ask for the result and wait.
 Mundane locked doors cannot be opened without a key, tools, or an established special ability.
 Player character: a skilled scout with lockpicks, no magic, and no tower key.
+
+The player controls their character's voluntary actions, exact speech, thoughts and choices.
+Suggested options are never exhaustive. Accept free-form actions without substituting a menu
+option. If intent is unclear, ask and wait. Continue the established scene, not a replacement.

@@ -361,7 +361,7 @@ for cloud development. HTTP tests require loopback socket access. Each cloud tas
 isolated; do not create another Git worktree unless requested. No application preview link
 is provided for this cloud instance. It cannot install or run software on your Windows PC.
 
-Validation for this revision: **38 tests passed, one Windows-only sharing-semantics test
+Validation for this revision: **42 tests passed, one Windows-only sharing-semantics test
 was skipped on Linux**. The tests include large-campaign request envelopes through the real
 Ollama adapter with controlled responses, independent lookups and corrections, exact citations,
 external edits, and exclusion of rejected drafts. Actual Qwen quality and GPU usage still
@@ -431,3 +431,36 @@ one short scene and check whether your campaign rules demand very long responses
 response or a response with no final text stops with a separate diagnostic rather than being
 accepted. This handling is tested with controlled Ollama responses; actual model performance
 and the cause of an individual Windows/Ollama interruption still need local observation.
+
+### Player control and free-form replies
+
+Your replies are not selections from a decision tree. The GM now receives a citable
+`player_control` source on every turn. It is instructed to continue the existing scene,
+accept off-menu attempts as written, and avoid option menus unless you request suggestions.
+Even requested suggestions are examples, not an exhaustive list. Only you supply your
+character's voluntary choices, speech, intentions and feelings. The GM may adjudicate failed
+attempts and rule-supported involuntary consequences, and NPCs remain independently controlled.
+An unclear input should receive a focused clarification question, not an assumed choice.
+
+The Administrator gets your message verbatim in a separate field and is explicitly instructed
+to reject invented PC speech, substitution of a suggested option, unchosen actions and scene
+resets used to force a branch. Revisions keep your original input. The latest approved scene
+is kept in full even when the rest of the library requires passage retrieval. Normal audit
+calls perform this check; no extra model call is added for player-control review.
+
+This update applies to existing campaigns without rewriting their Rules.txt. Newly created
+campaigns also receive these guidelines in their starter rules. Install by replacing the
+entire application `rpg` folder; it includes the new `player_control.py` module. No new model
+or dependency is needed.
+
+Already-approved narration and continuity are not silently erased. If an earlier response
+invented something for your character, state explicitly in your next message what you did
+and did not choose and request a correction before continuing. Do not delete event-log lines.
+A dedicated rollback/correction editor is not implemented. Review any resulting continuity
+proposals before approving them.
+
+The regression tests use controlled responses to verify verbatim input preservation, cited
+rejection followed by revision, retention of the current scene, clarification/failed-attempt
+handling, and no canon changes after three rejected agency violations. They do not prove that
+Qwen will always recognize an agency violation. If it still does this, preserve the exact
+player message and narration so a specific case can be investigated.

@@ -1,6 +1,7 @@
 """Campaign selection; no network or database is involved."""
 from pathlib import Path
 from .store import Store
+from .player_control import PLAYER_CONTROL
 
 
 class Campaigns:
@@ -37,7 +38,7 @@ class Campaigns:
         root.mkdir()  # Never replace an existing campaign.
         for directory in ('Characters', 'Continuity/Characters', 'Continuity', 'World', 'Templates'):
             (root / directory).mkdir(parents=True, exist_ok=True)
-        (root / 'Rules.txt').write_text('CAMPAIGN RULES\n\nAdjudicate impartially. Reward preparation and established capabilities.\nRoll only for meaningful uncertainty and consequences. Never invent player dice results.\nRespect established profiles, character-specific knowledge and the timeline.\n', encoding='utf-8')
+        (root / 'Rules.txt').write_text('CAMPAIGN RULES\n\nAdjudicate impartially. Reward preparation and established capabilities.\nRoll only for meaningful uncertainty and consequences. Never invent player dice results.\nRespect established profiles, character-specific knowledge and the timeline.\n\n' + PLAYER_CONTROL, encoding='utf-8')
         (root / 'Continuity' / 'World.txt').write_text('WORLD CONTINUITY\n\nWrite your initial situation here before playing.\n', encoding='utf-8')
         template = Path(__file__).parent.parent / 'examples' / 'Templates' / 'Character_Template.txt'
         (root / 'Templates' / 'Character_Template.txt').write_bytes(template.read_bytes())

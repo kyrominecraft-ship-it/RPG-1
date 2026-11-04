@@ -106,6 +106,8 @@ class Retriever:
             return result, self.report(result, [])
         check_budget(self.pinned, SOURCE_BUDGET - 8000, 'Always-included rules/player profiles (reserving retrieval space)', self.documents)
         result = dict(self.pinned)
+        if self.recent:
+            result[self.recent[-1]] = self.full[self.recent[-1]]
         if required:
             result.update(required)
         check_budget(result, budget, 'Always-included rules/player profiles and required evidence', self.documents)
@@ -141,6 +143,7 @@ class Retriever:
         return {'mode': 'full' if self.whole_fits else 'passages', 'topics': topics,
                 'source_bytes': size(sources), 'library_bytes': size(self.full),
                 'selected_sources': list(sources), 'catalog': self.catalog,
+                'current_scene_source': self.recent[-1] if self.recent else None,
                 'notice': ('All sources included.' if self.whole_fits else
                            'Partial evidence: rules/player profiles pinned; other files and story history retrieved. '
                            'Missing evidence is not proof of absence. Ask for lookup or clarification when needed.')}

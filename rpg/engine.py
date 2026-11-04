@@ -3,6 +3,7 @@ import json
 import urllib.error
 import urllib.request
 from .store import PERSPECTIVES
+from .player_control import PLAYER_CONTROL
 from .retrieval import Retriever, AUDIT_BUDGET
 from .context import check_budget, SOURCE_BUDGET, REQUEST_BUDGET, AUXILIARY_BUDGET, CONTEXT_TOKENS
 
@@ -14,8 +15,13 @@ player dice results. Ask and wait. Do not silently invent consequential off-scre
 Separate objective facts from beliefs and suspicions. Do not grant knowledge without an
 established learning event. Never rewrite established personalities, histories or motivations
 to fit narration. Return only proposed player-facing narration; you cannot write canon.
-Write one playable scene, usually 150–350 words, ending at the player's next meaningful
-choice. An adventure request starts the opening scene, not a complete adventure or campaign.
+Continue the existing scene in response to the player's actual message; do not generate a
+replacement scene each turn. Use only as much narration as needed (usually under 350 words).
+Only an initial adventure request calls for an opening scene, not a whole adventure.
+Follow the player_control source strictly. Leave space for free-form replies: no option menus
+unless explicitly requested, and never choose actions or speech for the player.
+For an ambiguous reply ask a focused question and wait. Resolve attempts under the rules;
+do not convert them to the closest suggested action. Stop before a new player decision.
 Do not output analysis, planning notes, or an entire setting guide.
 Retrieved passages may omit relevant facts. Read the retrieval notice and never assume a
 missing passage means an ability, relationship, or past event does not exist. Ask the player
@@ -36,6 +42,16 @@ request additional evidence with exactly {"lookup": ["specific search query", "a
 At most two lookup rounds, with up to three queries each, are available per draft. Use these
 to check relationships, abilities, past events or facts the GM may have missed. If evidence
 remains insufficient, reject and request clarification; never approve based on an assumption.
+Before any approval, compare the draft to player_input verbatim and the player_control source.
+Reject invented PC speech, thoughts, voluntary choices or promises; substitution of a menu option
+for the actual input; extra unchosen actions; and resetting the scene to force an offered branch.
+An offered menu never limits legal free-form actions. A player's attempt may legitimately fail
+under the rules, but do not replace it with a different attempt. Do not reject a draft merely
+because an NPC acts independently or a supported involuntary consequence affects the PC.
+An ambiguous input requires clarification, not an assumed answer. Distinguish these cases.
+Cite player_control (an exact quote) and explain the specific missing authorization, or cite
+player_action with an exact quotation of the actual input, when rejecting agency violations.
+Your correction must preserve the player's actual words and intent, not propose a nearby option.
 For a final decision output JSON only, exactly:
 {"approved": boolean, "issues": [{"problem": string, "source": string,
 "quote": string, "correction": string}], "updates": []}.
@@ -46,6 +62,9 @@ are made in a separate call ONLY AFTER a response is committed as an approved ev
 
 CONTINUITY_PROMPT = '''You maintain continuity from APPROVED CANONICAL EVENTS ONLY.
 You are given the selected approved event, other canon, profiles and existing continuity.
+Respect the player_control source. Do not infer a PC promise, feeling, decision or knowledge
+from a suggested option, a personality trait or an unchosen branch. Distinguish the player's
+attempt from its established outcome and preserve unresolved choices as unresolved.
 Return JSON exactly: {"updates": [{"document": "exact allowed target", "entries": [{
 "category": "fact", "perspective": "objective", "statement": "concise entry",
 "evidence": "exact quote from the selected approved narration",
@@ -188,6 +207,7 @@ class Engine:
         retriever = Retriever(snapshot)
         sources, retrieval = retriever.select(action)
         sources['player_action'] = action
+        sources['player_control'] = PLAYER_CONTROL
         turn = self.store.begin_turn(action, snapshot['revision'])
         audit = []
         approved = False
@@ -203,7 +223,7 @@ class Engine:
                 entry['lookups'] = []
                 for lookup_round in range(3):
                     raw = self.model.generate('admin', ADMIN_PROMPT, {'sources': admin_sources, 'draft': draft,
-                        'retrieval': admin_retrieval, 'lookups_remaining': 2 - lookup_round})
+                        'retrieval': admin_retrieval, 'player_input': action, 'lookups_remaining': 2 - lookup_round})
                     entry['administrator_raw'] = raw
                     parsed = json.loads(raw)
                     if not isinstance(parsed, dict) or 'lookup' not in parsed:
@@ -255,6 +275,7 @@ class Engine:
                 payload = {'approved_event': {'turn': turn, 'action': row['action'], 'response': row['response']},
                            'sources': {}, 'allowed_targets': snapshot['continuity_targets']}
                 payload['sources'], payload['retrieval'] = Retriever(snapshot).select(row['action'] + '\n' + row['response'])
+                payload['sources']['player_control'] = PLAYER_CONTROL
                 check_budget(payload, AUXILIARY_BUDGET, 'Continuity context', snapshot['documents'])
                 raw = self.model.generate('admin', CONTINUITY_PROMPT, payload)
                 audit.append({'administrator_raw': raw})
