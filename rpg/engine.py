@@ -14,6 +14,9 @@ player dice results. Ask and wait. Do not silently invent consequential off-scre
 Separate objective facts from beliefs and suspicions. Do not grant knowledge without an
 established learning event. Never rewrite established personalities, histories or motivations
 to fit narration. Return only proposed player-facing narration; you cannot write canon.
+Write one playable scene, usually 150–350 words, ending at the player's next meaningful
+choice. An adventure request starts the opening scene, not a complete adventure or campaign.
+Do not output analysis, planning notes, or an entire setting guide.
 Retrieved passages may omit relevant facts. Read the retrieval notice and never assume a
 missing passage means an ability, relationship, or past event does not exist. Ask the player
 for clarification if evidence is insufficient. Source IDs ending #chars=start:end identify
@@ -75,22 +78,42 @@ class Ollama:
                             'num_predict': 2048}}
         if role == 'admin':
             body['format'] = 'json'
-        check_budget(body, REQUEST_BUDGET, 'Complete model request')
-        request = urllib.request.Request(self.url + '/api/chat', json.dumps(body).encode(),
-                                         {'Content-Type': 'application/json'})
-        # Local Ollama must not be sent through a cloud or system HTTP proxy.
+        # Restart a truncated response once; never concatenate or accept partial text.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        try:
-            with opener.open(request, timeout=300) as response:
-                result = json.load(response)
-        except (OSError, urllib.error.URLError, ValueError) as exc:
-            raise RuntimeError('Ollama request failed. Start Ollama and pull the configured models.') from exc
-        if result.get('done') is not True or result.get('done_reason') == 'length':
-            raise ValueError('Model output was incomplete; this output was not accepted')
-        content = result.get('message', {}).get('content')
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError('Model returned an empty response')
-        return content
+        for attempt, output_limit in enumerate((2048, 4096)):
+            body['options']['num_predict'] = output_limit
+            if attempt:
+                body['messages'][0]['content'] = system + (
+                    '\nYour previous generation exceeded its output allowance and was discarded. '
+                    'Start over with a concise, complete response. Preserve the required format. '
+                    'Do not include planning notes, internal analysis, or an explanation of this retry.')
+            check_budget(body, REQUEST_BUDGET, 'Complete model request')
+            request = urllib.request.Request(self.url + '/api/chat', json.dumps(body).encode(),
+                                             {'Content-Type': 'application/json'})
+            try:
+                with opener.open(request, timeout=300) as response:
+                    result = json.load(response)
+            except (OSError, urllib.error.URLError, ValueError) as exc:
+                raise RuntimeError(f"Ollama request failed for {role} model '{self.models[role]}'. "
+                                   'Check Ollama is running and the configured model is installed.') from exc
+            if not isinstance(result, dict):
+                raise ValueError(f'Ollama returned an invalid result for {role}; output was not accepted')
+            if result.get('done') is not True:
+                raise ValueError(f"Ollama did not finish the {role} response from '{self.models[role]}'; "
+                                 'output was not accepted. Check the Ollama application for errors.')
+            if result.get('done_reason') == 'length':
+                if not attempt:
+                    continue
+                raise ValueError(f"The {role} model '{self.models[role]}' hit its {output_limit}-token output limit "
+                                 'even after one automatic retry. No incomplete text was accepted. '
+                                 'Try asking for one short opening scene, and check that campaign rules do not require very long replies.')
+            message = result.get('message')
+            content = message.get('content') if isinstance(message, dict) else None
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(f"The {role} model '{self.models[role]}' returned no final text. "
+                                 'No output was accepted. Check the model name and Ollama status.')
+            return content
+
 
 
 def validate_audit(raw, sources):

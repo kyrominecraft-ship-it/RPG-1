@@ -361,7 +361,7 @@ for cloud development. HTTP tests require loopback socket access. Each cloud tas
 isolated; do not create another Git worktree unless requested. No application preview link
 is provided for this cloud instance. It cannot install or run software on your Windows PC.
 
-Validation for this revision: **34 tests passed, one Windows-only sharing-semantics test
+Validation for this revision: **38 tests passed, one Windows-only sharing-semantics test
 was skipped on Linux**. The tests include large-campaign request envelopes through the real
 Ollama adapter with controlled responses, independent lookups and corrections, exact citations,
 external edits, and exclusion of rejected drafts. Actual Qwen quality and GPU usage still
@@ -415,3 +415,19 @@ checkable quotations. Fine-tuning does not turn a model into an exact, reliably 
 and it can still invent facts. It is better considered later for style or recurring behavior,
 after collecting examples and evaluation cases. Continue writing faction and setting TXT files
 in your campaign's `World` folder.
+
+### If a response hits its output limit
+
+The GM is now asked for one playable opening scene (usually 150–350 words), not a complete
+adventure in one reply. Each call starts with a 2,048-token output allowance. If Ollama
+explicitly reports that allowance was exhausted, the app discards the partial response and
+restarts the same request once with a 4,096-token allowance and a concise-completion reminder.
+The retry also preserves JSON mode for Administrator calls. Incomplete output never becomes
+canon or updates continuity. An output retry is not an Administrator rejection and does not
+change the three-rejected-drafts review rule. A retry can increase waiting time.
+
+If the retry also runs out, the error identifies the role, model and output limit. Ask for
+one short scene and check whether your campaign rules demand very long responses. An unfinished
+response or a response with no final text stops with a separate diagnostic rather than being
+accepted. This handling is tested with controlled Ollama responses; actual model performance
+and the cause of an individual Windows/Ollama interruption still need local observation.
