@@ -67,6 +67,10 @@ def passages(source_id, text):
         start = max(start + 1, end - 180)
 
 
+def event_text(row):
+    return 'PLAYER ACTION:\n' + row['action'] + '\n\nAPPROVED GM RESPONSE:\n' + row['response']
+
+
 class Retriever:
     def __init__(self, snapshot):
         self.snapshot = snapshot
@@ -77,7 +81,7 @@ class Retriever:
             if event['kind'] == 'story':
                 row = event['payload']['turn']
                 key = 'event:' + str(event['id'])
-                self.full[key] = json.dumps({'action': row['action'], 'response': row['response']}, ensure_ascii=False)
+                self.full[key] = event_text(row)
                 self.recent.append(key)
         self.pinned = {'document:' + n: d['content'] for n, d in self.documents.items() if is_pinned(n, d['content'])}
         self.catalog = [{'source': 'document:' + n, 'bytes': len(d['content'].encode('utf-8')), 'version': d['version']}

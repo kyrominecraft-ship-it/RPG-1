@@ -3,6 +3,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from .version import APP_VERSION
 
 
 def make_server(store, model, port=8000):
@@ -36,6 +37,8 @@ def make_server(store, model, port=8000):
                 return self.send(403, '{}')
             if self.path == '/':
                 return self.send(200, Path(__file__).with_name('index.html').read_text(encoding='utf-8'), 'text/html')
+            if self.path == '/chat.js':
+                return self.send(200, Path(__file__).with_name('chat.js').read_text(encoding='utf-8'), 'text/javascript')
             if self.path == '/api/state':
                 try:
                     if manager.current:
@@ -47,6 +50,7 @@ def make_server(store, model, port=8000):
                         state['profile_drafts'] = active.profile_drafts()
                     else:
                         state = {'documents': {}, 'events': [], 'paused': None, 'pending_updates': [], 'warnings': [], 'campaign': None}
+                    state['version'] = APP_VERSION
                     state['campaigns'] = manager.list()
                     state['campaign_home'] = str(manager.home)
                     return self.send(200, json.dumps(state))

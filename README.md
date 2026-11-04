@@ -361,7 +361,7 @@ for cloud development. HTTP tests require loopback socket access. Each cloud tas
 isolated; do not create another Git worktree unless requested. No application preview link
 is provided for this cloud instance. It cannot install or run software on your Windows PC.
 
-Validation for this revision: **42 tests passed, one Windows-only sharing-semantics test
+Validation for this revision: **47 tests passed, one Windows-only sharing-semantics test
 was skipped on Linux**. The tests include large-campaign request envelopes through the real
 Ollama adapter with controlled responses, independent lookups and corrections, exact citations,
 external edits, and exclusion of rejected drafts. Actual Qwen quality and GPU usage still
@@ -464,3 +464,39 @@ rejection followed by revision, retention of the current scene, clarification/fa
 handling, and no canon changes after three rejected agency violations. They do not prove that
 Qwen will always recognize an agency violation. If it still does this, preserve the exact
 player message and narration so a specific case can be investigated.
+
+### Prototype 0.1.1: continuation and readable chat
+
+This update addresses replayed scene openings and hard-to-read presentation. The GM now
+receives the latest approved exchange as actual user/assistant conversation turns, with
+your current input as the final user message. Reference material is labeled separately;
+the same latest event is not also duplicated as a JSON source inside the GM reference block.
+Earlier approved events remain available through retrieval. The Administrator still receives
+citable sources and a separate verbatim player input.
+
+The app detects a copied block of at least 45 consecutive words within the first 10 narrative
+words of a reply, ignoring Markdown headings. It rejects that replay and requests a continuation
+even if the model auditor approved it. Explicit requests for recaps/repetition are exempt.
+Three rejected drafts still pause for review. This is a narrow text-overlap safeguard: it
+cannot detect every paraphrased restart, ignored question, invented relationship or agency
+violation. The Administrator is instructed to check those too; real Qwen behavior still needs
+to be assessed. Story-event excerpts now use readable action/response text for exact citations;
+stored event records are unchanged.
+
+Your input and the GM response have separate labeled blocks. Basic Markdown headings,
+paragraphs, emphasis, separators and lists render safely without treating model output as HTML.
+Unsupported Markdown remains text. This formatting changes only display, not the saved story.
+Existing repetitions in historical replies are not deleted or edited by this update.
+
+To install, stop the running app, download the current GitHub ZIP, and replace the entire
+application **rpg** folder, including `chat.js`, `narration.py` and `version.py`. Restart
+`Start-RPG.bat`, refresh your browser, and check that **Prototype 0.1.1** appears near the top.
+If it does not, check that you restarted the copy you updated; an older terminal may still
+be serving the old application. Keep your campaign folder and `.rpg` history intact.
+
+Regression tests cover chronological request construction, verbatim current input, replay
+rejection even after a model approval, three-rejection pause, recap exceptions and safe chat
+formatting. The renderer test uses Node only as an optional development check; Windows users
+without Node will see that test skipped, and do not need to install it to play. The browser
+requires no extra library or Internet connection for formatting. Real browser layout on
+Windows and Qwen response quality have not been tested in this cloud environment.

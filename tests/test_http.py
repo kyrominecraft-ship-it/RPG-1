@@ -46,6 +46,9 @@ class HTTPTests(unittest.TestCase):
             try:
                 with opener.open(url + '/') as response:
                     self.assertIn('Your action', response.read().decode())
+                with opener.open(url + '/chat.js') as response:
+                    self.assertEqual(response.headers.get_content_type(), 'text/javascript')
+                    self.assertIn('textContent', response.read().decode())
                 request = urllib.request.Request(url + '/api/play', json.dumps({'action': 'Listen at the door.'}).encode(),
                                                   {'Content-Type': 'application/json', 'Origin': url})
                 with opener.open(request) as response:
@@ -58,6 +61,7 @@ class HTTPTests(unittest.TestCase):
                     state = json.load(response)
                 self.assertEqual(len([e for e in state['events'] if e['kind'] == 'story']), 1)
                 self.assertEqual(len(state['documents']), 1)
+                self.assertEqual(state['version'], '0.1.1')
                 request = urllib.request.Request(url + '/api/play', b'{}',
                     {'Content-Type': 'application/json', 'Origin': 'https://unrelated.example'})
                 with self.assertRaises(urllib.error.HTTPError) as error:

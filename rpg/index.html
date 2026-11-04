@@ -6,10 +6,10 @@ body{max-width:950px;margin:28px auto;padding:0 20px;background:#18191c;color:#e
 textarea,input,select,button{font:inherit;padding:9px;background:#282b31;color:#eee;border:1px solid #777;border-radius:5px}
 textarea{box-sizing:border-box;width:100%;height:100px}input{min-width:240px;max-width:90%}button{cursor:pointer;margin:6px 6px 6px 0}
 button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.5 monospace}
-article,section.panel{border-bottom:1px solid #555;padding:14px 0}article{white-space:pre-wrap}#status,#warnings{color:#e8c889}
+article,section.panel{border-bottom:1px solid #555;padding:14px 0}.player-input{white-space:pre-wrap}.chat-turn h3{font-size:.85rem;color:#bfc7d8;margin:0 0 8px}.player-message{background:#252933;padding:14px;border-radius:6px;margin-bottom:18px}.narrative p{margin:0 0 1em}.narrative h4{font-size:1.1rem;margin:16px 0 10px}.narrative hr{border:0;border-top:1px solid #555;margin:20px 0}#status,#warnings{color:#e8c889}
 #campaignPath{overflow-wrap:anywhere}summary{cursor:pointer}h2{font-size:1.2rem}
 </style>
-<h1>Local RPG</h1>
+<h1>Local RPG</h1><p id="version"></p>
 <section class="panel"><h2>Choose your campaign</h2>
 <button id="browse">Choose folder…</button><select id="campaignList"><option value="">Saved campaign folders</option></select><button id="selectCampaign">Open selected</button>
 <details><summary>Open a folder by its path</summary><input id="folderPath" aria-label="Campaign folder path"><button id="openPath">Open folder</button></details>
@@ -29,6 +29,7 @@ article,section.panel{border-bottom:1px solid #555;padding:14px 0}article{white-
 <section id="history" aria-live="polite"></section>
 <form id="play"><label for="action">Your action</label><textarea id="action" maxlength="4000" required></textarea><button id="submit">Send action</button></form>
 <p id="status" role="status"></p><section id="review"></section>
+<script src="/chat.js"></script>
 <script>
 const $=id=>document.getElementById(id);let busy=false;let current=null;
 async function api(path,body){const response=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -36,7 +37,7 @@ async function api(path,body){const response=await fetch('/api/'+path,body===und
 async function operation(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);
  try{await fn();}catch(e){$('status').textContent=e.message;}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
 function button(label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>operation(fn);return b;}
-function message(text){const a=document.createElement('article');a.textContent=text;$('history').append(a);}
+function message(action,response){$('history').append(RPGChat.turn(action,response));}
 function showAudit(turn){const box=document.createElement('section');const h=document.createElement('h2');h.textContent=turn.status==='paused'?'Paused after three rejections':'Generation stopped';
  const pre=document.createElement('pre');pre.textContent='Player action: '+turn.action+'\n\n'+JSON.stringify(turn.audit,null,2);box.append(h,pre);
  if(turn.status==='paused')box.append(button('I reviewed the audit — resume',async()=>{await api('resume',{turn:turn.id});await load();$('status').textContent='Resumed. Rejected drafts remain noncanonical.';}));
@@ -50,10 +51,10 @@ function showUpdates(turn){const panel=document.createElement('section');const h
  $('review').append(panel);}
 function sourceInfo(state){$('campaignPath').textContent=state.campaign?'Current folder: '+state.campaign:'No campaign selected. Choose or create one above.';
  $('sources').textContent='Loaded files: '+Object.keys(state.documents).join(', ');$('warnings').textContent=state.warnings.join('\n');}
-async function load(){const state=await api('state');current=state.campaign;sourceInfo(state);
+async function load(){const state=await api('state');current=state.campaign;sourceInfo(state);$('version').textContent=state.version?'Prototype '+state.version:'Older server — restart the app after updating.';
  const chosen=$('campaignList').value;$('campaignList').replaceChildren(new Option('Choose a campaign', ''));for(const c of state.campaigns)$('campaignList').add(new Option(c.name,c.path));$('campaignList').value=chosen;
  $('history').replaceChildren();$('review').replaceChildren();
- const stories=state.events.filter(e=>e.kind==='story');for(const e of stories){const t=e.payload.turn;message('You: '+t.action+'\n\nGM: '+t.response);}
+ const stories=state.events.filter(e=>e.kind==='story');for(const e of stories){const t=e.payload.turn;message(t.action,t.response);}
  if(state.paused)showAudit(state.paused);for(const t of state.pending_updates)showUpdates(t);
  if(!state.pending_updates.length&&stories.length)showUpdates({...stories.at(-1).payload.turn,proposals:[]});
  if(window.renderTemplates)window.renderTemplates(state);

@@ -4,7 +4,8 @@ import urllib.error
 import urllib.request
 from .store import PERSPECTIVES
 from .player_control import PLAYER_CONTROL
-from .retrieval import Retriever, AUDIT_BUDGET
+from .narration import replay_issue
+from .retrieval import Retriever, AUDIT_BUDGET, event_text
 from .context import check_budget, SOURCE_BUDGET, REQUEST_BUDGET, AUXILIARY_BUDGET, CONTEXT_TOKENS
 
 GM_PROMPT = '''You are an impartial dark fantasy tabletop Game Master.
@@ -23,6 +24,12 @@ unless explicitly requested, and never choose actions or speech for the player.
 For an ambiguous reply ask a focused question and wait. Resolve attempts under the rules;
 do not convert them to the closest suggested action. Stop before a new player decision.
 Do not output analysis, planning notes, or an entire setting guide.
+The final user message is the current player input. Earlier assistant messages are approved
+past narration, not a format to copy. Respond to the current question/action immediately.
+Do not recap the setting, replay introductions, hand over an object again, or repeat the
+last offer unless the player specifically requests a recap. Do not skip a direct question
+in order to continue a quest pitch. Distinguish established facts from proposed possibilities.
+Use normal paragraphs, no recurring "Opening Scene" or "Scene" heading each turn.
 Retrieved passages may omit relevant facts. Read the retrieval notice and never assume a
 missing passage means an ability, relationship, or past event does not exist. Ask the player
 for clarification if evidence is insufficient. Source IDs ending #chars=start:end identify
@@ -43,6 +50,9 @@ At most two lookup rounds, with up to three queries each, are available per draf
 to check relationships, abilities, past events or facts the GM may have missed. If evidence
 remains insufficient, reject and request clarification; never approve based on an assumption.
 Before any approval, compare the draft to player_input verbatim and the player_control source.
+Check whether the current question/action was actually addressed. Reject a scene restart,
+replayed introduction or quest offer, duplicated narrative, and invented prior acquaintance
+used to replace the ongoing exchange. Prior assistant text is past narration, not a template.
 Reject invented PC speech, thoughts, voluntary choices or promises; substitution of a menu option
 for the actual input; extra unchosen actions; and resetting the scene to force an offered branch.
 An offered menu never limits legal free-form actions. A player's attempt may legitimately fail
@@ -90,9 +100,24 @@ class Ollama:
         self.models = {'gm': gm, 'admin': admin}
 
     def generate(self, role, system, payload):
+        if role == 'gm' and 'action' in payload and 'conversation' in payload:
+            reference = {k: v for k, v in payload.items() if k not in ('conversation', 'action')}
+            # These same events are provided as actual conversation turns, not twice as JSON.
+            event_ids = {e['source'] for e in payload['conversation']}
+            reference['sources'] = {k: v for k, v in reference['sources'].items()
+                                    if k.split('#chars=')[0] not in event_ids and k != 'player_action'}
+            messages = [{'role': 'system', 'content': system},
+                        {'role': 'user', 'content': 'CAMPAIGN REFERENCES AND REVISION FEEDBACK (not a new scene or player action):\n'
+                         + json.dumps(reference, ensure_ascii=False)}]
+            for exchange in payload['conversation']:
+                messages.extend([{'role': 'user', 'content': exchange['action']},
+                                 {'role': 'assistant', 'content': exchange['response']}])
+            messages.append({'role': 'user', 'content': payload['action']})
+        else:
+            messages = [{'role': 'system', 'content': system},
+                        {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]
         body = {'model': self.models[role], 'stream': False, 'keep_alive': '5m',
-                'messages': [{'role': 'system', 'content': system},
-                             {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}],
+                'messages': messages,
                 'options': {'temperature': 0.2 if role == 'gm' else 0, 'num_ctx': CONTEXT_TOKENS,
                             'num_predict': 2048}}
         if role == 'admin':
@@ -188,7 +213,7 @@ def canonical_sources(snapshot):
     for event in snapshot['events']:
         if event['kind'] == 'story':
             row = event['payload']['turn']
-            sources['event:' + str(event['id'])] = json.dumps({'action': row['action'], 'response': row['response']})
+            sources['event:' + str(event['id'])] = event_text(row)
     return sources
 
 
@@ -208,12 +233,14 @@ class Engine:
         sources, retrieval = retriever.select(action)
         sources['player_action'] = action
         sources['player_control'] = PLAYER_CONTROL
+        conversation = [{'source': 'event:' + str(e['id']), 'action': e['payload']['turn']['action'],
+                         'response': e['payload']['turn']['response']} for e in snapshot['events'] if e['kind'] == 'story'][-1:]
         turn = self.store.begin_turn(action, snapshot['revision'])
         audit = []
         approved = False
         try:
             for attempt in range(1, 4):
-                draft = self.model.generate('gm', GM_PROMPT, {'sources': sources, 'retrieval': retrieval, 'action': action, 'previous_attempts': [{'draft': a['draft'], 'review': a.get('review', {})} for a in audit[-1:]]})
+                draft = self.model.generate('gm', GM_PROMPT, {'sources': sources, 'retrieval': retrieval, 'action': action, 'conversation': conversation, 'previous_attempts': [{'draft': a['draft'], 'review': a.get('review', {})} for a in audit[-1:]]})
                 if not isinstance(draft, str) or not draft.strip() or len(draft) > 12000:
                     raise ValueError('Invalid or oversized GM draft')
                 entry = {'attempt': attempt, 'draft': draft}
@@ -241,6 +268,12 @@ class Engine:
                     admin_sources, admin_retrieval = new_sources, new_report
                 entry['admin_retrieval'] = admin_retrieval
                 review = validate_audit(raw, admin_sources)
+                if conversation:
+                    previous = conversation[-1]
+                    replay = replay_issue(draft, previous['response'], action, previous['source'])
+                    if replay:
+                        entry['application_checks'] = [replay]
+                        review = {'approved': False, 'issues': review['issues'] + [replay], 'updates': []}
                 entry['review'] = review
                 # Give corrections their exact independently retrieved supporting passages.
                 for issue in review['issues']:

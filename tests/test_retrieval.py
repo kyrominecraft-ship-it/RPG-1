@@ -140,7 +140,7 @@ class RetrievalTests(unittest.TestCase):
                 body = json.loads(request.data)
                 calls.append(body)
                 self.assertLessEqual(len(json.dumps(body, ensure_ascii=False).encode()), REQUEST_BUDGET)
-                payload = json.loads(body['messages'][1]['content'])
+                payload = json.loads(body['messages'][1]['content']) if 'format' in body else {}
                 content = (json.dumps({'updates': []}) if 'approved_event' in payload else
                            json.dumps(APPROVE) if 'format' in body else RESPONSE)
                 return io.BytesIO(json.dumps({'done': True, 'message': {'content': content}}).encode())
