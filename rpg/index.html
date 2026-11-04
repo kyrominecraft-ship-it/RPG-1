@@ -64,6 +64,7 @@ $('openPath').onclick=()=>operation(async()=>{await api('campaign/select',{path:
 $('create').onclick=()=>operation(async()=>{await api('campaign/create',{name:$('newName').value});await load();$('status').textContent='Campaign created. Edit Rules.txt and add character profiles before playing.';});
 $('play').onsubmit=e=>{e.preventDefault();operation(async()=>{$('status').textContent='GM and administrator are working. Local generation may take several minutes.';
  const result=await api('play',{action:$('action').value});if(result.status==='approved'){$('action').value='';await load();$('status').textContent='Approved narration recorded as canon. Review continuity additions below.';
+ if(result.retrieval_mode==='passages')$('status').textContent+=' Relevant passages were retrieved; full rules and registered player profile were retained.';
  if(result.continuity_audit?.some(a=>a.error)){$('status').textContent+=' Continuity proposals failed; you can retry below.';}}
  else{await load();if(result.status!=='paused')showAudit(result);$('status').textContent='No story event was saved.';}});};
 function profileDraft(draft){const panel=document.createElement('section');const h=document.createElement('h3');h.textContent='Unsaved profile draft: '+draft.document;

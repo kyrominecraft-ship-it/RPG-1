@@ -15,25 +15,35 @@ are needed. The application uses Python's built-in tools.
 
 ### 1. Download and extract the application
 
-Download **LocalRPG.zip** supplied with this work. Save it to your Windows **Downloads**
-folder using that exact filename. This package contains the current prototype; the GitHub
-repository has not been updated by this task, so downloading the old repository would not
-necessarily give you these changes.
+Open [your GitHub repository](https://github.com/kyrominecraft-ship-it/RPG-1).
+Above the file list, click the green **Code** button, then **Download ZIP**.
+Save **RPG-1-main.zip** in your Windows **Downloads** folder.
 
-Open **PowerShell** from the Start menu. Copy and run each of these lines:
+Open **PowerShell** from the Start menu. Run these lines:
 
 ```powershell
-Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\LocalRPG.zip"
-Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\LocalRPG.zip" -DestinationPath "$env:USERPROFILE"
-Set-Location "$env:USERPROFILE\LocalRPG"
+Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\RPG-1-main.zip"
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\RPG-1-main.zip" -DestinationPath "$env:USERPROFILE"
+Set-Location "$env:USERPROFILE\RPG-1-main"
 py -3 --version
 ```
 
-The last command should show Python **3.12 or newer**. The extracted application is in
-`LocalRPG` inside your Windows user folder. Inside it you should see `Start-RPG.bat`, this
-README, and the `rpg`, `tests`, and `examples` folders. Do not run it from inside the ZIP.
-If extraction says files already exist, stop rather than overwriting an older installation.
-Keep your campaign folders separate from the application folder.
+The last command should show Python **3.12 or newer**. Inside `RPG-1-main` you should see
+`Start-RPG.bat`, this README, and the `rpg`, `tests`, and `examples` folders.
+Do not run the application from inside the ZIP. If an installation already exists, follow
+the update instructions below instead of extracting over it. Keep campaigns separate.
+
+### Updating an existing installation
+
+Stop the app with Ctrl+C in its terminal. Download a fresh ZIP from GitHub and extract it
+into a temporary folder using File Explorer's **Extract All**. Open the extracted folder
+until you see `Start-RPG.bat`. Copy its entire **rpg** folder into your existing application
+folder and choose **Replace the files in the destination**. Include new files such as
+`retrieval.py`; replacing only `engine.py` will not work. Copy the new README if wanted.
+Then launch your existing `Start-RPG.bat` and select your campaign again.
+
+**Do not replace, move or delete your campaign folder or its `.rpg` history.** No campaign
+migration, import, extra Python package, or extra Ollama model is needed for this update.
 
 ### 2. Check the application
 
@@ -315,13 +325,15 @@ actions while it is working. `ollama ps` in PowerShell during generation shows G
   native folder picker, launcher, deny-write handles and your GPU were not executed here.
 - **Model quality:** separate prompts are not a guarantee of independent judgment. Exact
   quotations can be misinterpreted; important changes require your review.
-- **Small campaign context:** a file is limited to 200 KB, but all active source/story context
-  must currently fit a 48,000-byte budget. Complete model requests have a separate 96,000-byte limit.
-  Profile drafting and continuity have their own small request budgets. The app refuses
-  oversized contexts instead of intentionally dropping history. These byte budgets are not
-  exact model-token counts; unusual text may still exceed the requested 32,768-token context.
-  Start with 1–3 short NPC profiles. Supporting more characters needs no schema redesign,
-  but larger/longer campaigns will need retrieval before these limits become comfortable.
+- **Campaign size versus request size:** larger libraries now use passage retrieval. This
+  revision is tested with a synthetic library larger than 128 KB, including roughly 19 KB
+  of rules and 27 KB of player profile. The per-file limit remains 200 KB. This is not a
+  claim that a 1 GB library is fast or thoroughly tested; sources and indexes are currently
+  held in RAM and rebuilt for a snapshot. A disk index is future work.
+- **Bounded model requests:** GM evidence is budgeted at 64,000 JSON UTF-8 bytes; Administrator
+  evidence can grow to 76,000 bytes through lookup. The complete request guard remains 96,000
+  bytes and Ollama context 32,768 tokens. These byte limits are not exact token counts. Unusual
+  text may still exceed model context. GPU use, latency and model accuracy need local testing.
 - **One local player:** run one application instance per campaign. It is not a networked or
   packaged Windows product. There is no automatic off-screen simulator, dice roller,
   cancellation, deterministic RPG rules engine, or automatic recovery of an interrupted turn.
@@ -349,17 +361,57 @@ for cloud development. HTTP tests require loopback socket access. Each cloud tas
 isolated; do not create another Git worktree unless requested. No application preview link
 is provided for this cloud instance. It cannot install or run software on your Windows PC.
 
-Validation for this revision: **25 tests passed, one Windows-only sharing-semantics test
-was skipped on Linux**. JavaScript syntax and command-line help were also checked. Real
-Ollama inference and browser interactions on Windows remain to be verified on your PC.
+Validation for this revision: **34 tests passed, one Windows-only sharing-semantics test
+was skipped on Linux**. The tests include large-campaign request envelopes through the real
+Ollama adapter with controlled responses, independent lookups and corrections, exact citations,
+external edits, and exclusion of rejected drafts. Actual Qwen quality and GPU usage still
+require play-testing on your Windows PC.
 
-### Full-source context update
+## How retrieval works for your 128 KB campaign
 
-The original 18 KB total campaign limit has been increased to 48,000 UTF-8 JSON bytes,
-with a 96,000-byte complete request guard and a requested Ollama context of 32,768 tokens.
-Both roles still receive all sources; no retrieval, summarization, or source filtering is
-performed. Larger context can increase GPU memory use and latency. Byte limits are only
-application guards, not exact token estimates. If the guard is exceeded, its error includes
-the total size and largest source documents. Your campaign files and history are preserved.
-This change has automated coverage above the previous 18 KB threshold; actual GPU memory
-usage and response quality still require validation on your PC.
+The earlier 18/48 KB *whole-campaign* gate no longer blocks larger libraries. The app searches
+local text without changing your source files, adding a database, training Qwen, or downloading
+another model. If a small library fits, it continues to receive full-source treatment.
+
+For larger libraries:
+
+1. **Rules are always included in full.** Keep the main file named `Rules.txt`. Files with
+   a separate `rules`/`rule` word in the name, and files under `Rules`, are also always included.
+   Do not use these names for unrelated archive material.
+2. **Your player profile can be included in full.** Name it `Characters/Player_Character.txt`,
+   or start a differently named character profile with `This is the player-controlled character.`
+   Mentioning the player in an ordinary NPC profile does not register that NPC as the player.
+3. Rules and player profiles must together fit about 56,000 serialized bytes, leaving room
+   for other evidence. Your reported 19 KB rules plus 27 KB profile are the intended scale.
+   If the mandatory material exceeds the budget, the app stops rather than quietly dropping it.
+4. Other sources and approved story history are split into overlapping passages. Local
+   keyword ranking, filenames, recent scene text and topic vocabulary (combat, relationships,
+   knowledge, travel and magic) select relevant passages. Custom document headings still work;
+   these topic words do not impose a character schema or new game rules.
+5. The Administrator performs another search using the action **and GM draft**, keeps the GM's
+   evidence, and can request up to two additional lookup rounds before deciding. A retrieved
+   citation used in a correction is passed back to the GM. Lookup does not consume another
+   GM draft attempt. Protocol failures or exhausted lookups stop the turn without making it canon.
+6. Continuity proposals and character drafting also use relevant retrieved evidence. Continuity
+   proposals still require an already-approved event and your confirmation before writing.
+
+A citation such as `document:World/Factions.txt#chars=1400:2700` identifies an exact character
+range in that source version. Selected source IDs, source versions, topics and lookup requests
+are recorded in the audit log. Rejected drafts are never indexed as canonical source material.
+External file edits take effect on the next refreshed snapshot, and existing stale-write checks
+still apply. The app shows a retrieval notice after an approved response that used passages.
+
+**Limitations:** this is lexical retrieval with English topic vocabulary, not semantic embeddings.
+It can miss paraphrases, hidden connections or relevant old events. The Administrator is instructed
+to search or ask for clarification when evidence is insufficient, but an LLM can still approve a
+mistake. Passing software tests does not prove narrative correctness. Review early sessions,
+especially character knowledge, relationships and capability use. Older events remain intact
+on disk even when they are not selected for a particular request.
+
+### Do setting and factions need model training?
+
+Not for this play-test. Editable source documents plus retrieval keep lore current and provide
+checkable quotations. Fine-tuning does not turn a model into an exact, reliably updated database,
+and it can still invent facts. It is better considered later for style or recurring behavior,
+after collecting examples and evaluation cases. Continue writing faction and setting TXT files
+in your campaign's `World` folder.

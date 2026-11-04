@@ -1,7 +1,7 @@
 """Free-text templates; heading suggestions never restrict legitimate profile content."""
 import re
 from .context import check_budget, AUXILIARY_BUDGET
-from .engine import canonical_sources
+from .retrieval import Retriever
 
 PROFILE_PROMPT = '''Draft ONE important NPC profile using the selected editable TXT template
 as guidance and the player's brief. Use the campaign's current rules and sources. Preserve
@@ -56,8 +56,9 @@ def draft_profile(store, model, name, template, brief):
     target = 'Characters/' + name + '.txt'
     if any(n.casefold() == target.casefold() for n in snapshot['documents']):
         raise ValueError('A profile with this name already exists; existing profiles are never replaced')
+    selected, retrieval = Retriever(snapshot).select(name + '\n' + brief)
     payload = {'name': name, 'brief': brief, 'template': snapshot['documents'][template]['content'],
-               'campaign_sources': canonical_sources(snapshot)}
+               'campaign_sources': selected, 'retrieval': retrieval}
     check_budget(payload, AUXILIARY_BUDGET, 'Profile drafting context', snapshot['documents'])
     content = model.generate('gm', PROFILE_PROMPT, payload)
     if not isinstance(content, str) or not content.strip() or len(content.encode()) > 20000:

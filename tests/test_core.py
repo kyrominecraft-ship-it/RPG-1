@@ -223,10 +223,12 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(model.calls[1][1]['sources']['document:long-world.txt'], 'world detail ' * 2000)
 
     def test_context_limit_and_path_escape(self):
-        (self.root / 'large.txt').write_text('x' * 49000)
-        with self.assertRaisesRegex(ValueError, 'context budget'):
+        (self.root / 'large.txt').write_text('x' * 10000)
+        (self.root / 'Rules.txt').write_text('x' * 65000)
+        with self.assertRaisesRegex(ValueError, 'Always-included'):
             self.play()
         (self.root / 'large.txt').unlink()
+        (self.root / 'Rules.txt').write_text('Original rules.')
         outside = Path(self.tmp.name) / 'outside.txt'
         outside.write_text('outside')
         try:

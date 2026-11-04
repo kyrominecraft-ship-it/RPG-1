@@ -81,6 +81,7 @@ def make_server(store, model, port=8000):
                     if self.path == '/api/play':
                         result = engine.play(body.get('action'))
                         if result['status'] == 'approved':
+                            result['retrieval_mode'] = result['audit'][-1].get('gm_retrieval', {}).get('mode', 'full')
                             result.pop('audit')
                     elif self.path == '/api/profile/draft':
                         result = draft_profile(active, model, body.get('name'), body.get('template'), body.get('brief'))
